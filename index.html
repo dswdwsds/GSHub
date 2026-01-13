@@ -1,114 +1,472 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  serverTimestamp 
+} from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  Gamepad2, 
+  Users, 
+  ShieldCheck, 
+  CreditCard, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle,
+  Trophy,
+  ChevronRight,
+  Flame
+} from 'lucide-react';
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bounty Rush - تطوير الشخصيات المميز</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
+// --- Configuration ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-<body>
-    <div class="background-overlay"></div>
-    <div class="glow-sphere"></div>
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1395038941110866010/MucgrT_399C44lfUVL79HcqR4cfwNbJlL5iG1qPmxdBF47GGbTbmkokZK6YnslmJ63wL";
+const VODAFONE_CASH_NUMBER = "010XXXXXXXX"; // ضع رقمك هنا
 
-    <main class="container">
-        <header>
-            <div class="logo-area">
-                <h1 class="premium-title">BOUNTY RUSH</h1>
-                <div class="title-glow"></div>
+// --- Assets & Data ---
+const CHARACTERS = [
+  // 2 Stars
+  { id: "001", name: "مونكي دي لوفي", title: "قبطان طاقم قبعة القش", stars: 2, type: "مهاجم", element: "أحمر", img: "https://static.wikia.nocookie.net/onepiece/images/a/af/Luffy_Bounty_Rush.png" },
+  { id: "002", name: "رورونوا زورو", title: "مقاتل طاقم قبعة القش", stars: 2, type: "مدافع", element: "أخضر", img: "https://static.wikia.nocookie.net/onepiece/images/b/b4/Zoro_Bounty_Rush.png" },
+  { id: "003", name: "يوسوب", title: "قناص طاقم قبعة القش", stars: 2, type: "عداء", element: "أزرق", img: "https://static.wikia.nocookie.net/onepiece/images/7/73/Usopp_Bounty_Rush.png" },
+  { id: "009", name: "كوبي", title: "فتى المهام", stars: 2, type: "مدافع", element: "أحمر", img: "https://static.wikia.nocookie.net/onepiece/images/c/c1/Koby_Bounty_Rush.png" },
+  { id: "013", name: "هيغوما الدب", title: "زعيم قطاع طرق الجبل", stars: 2, type: "مهاجم", element: "أحمر", img: "https://static.wikia.nocookie.net/onepiece/images/3/30/Higuma_Bounty_Rush.png" },
+  
+  // 3 Stars
+  { id: "027", name: "باجي", title: "كابتن قراصنة باجي", stars: 3, type: "عداء", element: "أحمر", img: "https://static.wikia.nocookie.net/onepiece/images/a/a2/Buggy_Bounty_Rush.png" },
+  { id: "030", name: "نيفيرتاري فيفي", title: "الآنسة وينزداي", stars: 3, type: "عداء", element: "أزرق", img: "https://static.wikia.nocookie.net/onepiece/images/e/e0/Vivi_Bounty_Rush.png" },
+  { id: "031", name: "يوسوب", title: "مطرقة الـ 5 طن", stars: 3, type: "مهاجم", element: "أزرق", img: "https://static.wikia.nocookie.net/onepiece/images/7/73/Usopp_Bounty_Rush.png" },
+
+  // 4 Stars & EX
+  { id: "034", name: "شانكس", title: "كابتن قراصنة الشعر الأحمر", stars: 4, type: "مهاجم", element: "أحمر", img: "https://static.wikia.nocookie.net/onepiece/images/b/be/Shanks_Bounty_Rush.png" },
+  { id: "038", name: "دراكول ميهوك", title: "أقوى سياف في العالم", stars: 4, type: "مهاجم", element: "أحمر", img: "https://static.wikia.nocookie.net/onepiece/images/d/d7/Mihawk_Bounty_Rush.png" },
+  { id: "EX1", name: "إيس وياماتو", title: "أميرة الغول ونبضة النار", stars: 4, type: "مهاجم ثنائي", element: "أحمر", img: "https://static.wikia.nocookie.net/onepiece/images/f/f5/Ace_and_Yamato_Bounty_Rush.png" },
+  { id: "EX2", name: "غول دي روجر", title: "القرصان العظيم", stars: 4, type: "عداء", element: "ظلام", img: "https://static.wikia.nocookie.net/onepiece/images/b/b3/Gol_D._Roger_Bounty_Rush.png" },
+  { id: "EX3", name: "إس-سنيك", title: "السيرابيم", stars: 4, type: "مدافع", element: "أزرق", img: "https://static.wikia.nocookie.net/onepiece/images/a/a6/S-Snake_Bounty_Rush.png" },
+];
+
+const STAR_PRICES = { 2: 30, 3: 60, 4: 80 };
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [selectedChars, setSelectedChars] = useState([]);
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [myOrder, setMyOrder] = useState(null);
+  const [queueInfo, setQueueInfo] = useState({ total: 0, position: 0 });
+  const [view, setView] = useState('home');
+
+  // Rule 3: Auth Before Queries
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth initialization failed:", err);
+      }
+    };
+    initAuth();
+    return onAuthStateChanged(auth, setUser);
+  }, []);
+
+  // Rule 1 & 2: Firestore Listeners
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'artifacts', appId, 'public', 'data', 'orders'), 
+      orderBy('createdAt', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const activeOrders = orders.filter(o => o.status !== 'completed');
+      
+      const userOrder = activeOrders.find(o => o.userId === user.uid);
+      if (userOrder) {
+        setMyOrder(userOrder);
+        const pos = activeOrders.findIndex(o => o.userId === user.uid) + 1;
+        setQueueInfo({ total: activeOrders.length, position: pos });
+        setView('status');
+      } else {
+        setMyOrder(null);
+        setQueueInfo({ total: activeOrders.length, position: 0 });
+      }
+    }, (err) => {
+      console.error("Firestore error:", err);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const toggleCharacter = (char) => {
+    if (selectedChars.find(c => c.id === char.id)) {
+      setSelectedChars(selectedChars.filter(c => c.id !== char.id));
+    } else {
+      setSelectedChars([...selectedChars, char]);
+    }
+  };
+
+  const totalPrice = selectedChars.reduce((sum, char) => sum + (STAR_PRICES[char.stars] || 80), 0);
+
+  const handleSubmitOrder = async () => {
+    if (!user) {
+      console.error("User not authenticated");
+      return;
+    }
+    if (!phone || selectedChars.length === 0) return;
+    setLoading(true);
+
+    try {
+      const orderData = {
+        userId: user.uid,
+        phone,
+        characters: selectedChars,
+        totalPrice,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        orderNumber: Date.now()
+      };
+
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderData);
+      
+      await sendDiscordNotification(orderData, docRef.id);
+      
+      setLoading(false);
+      setView('status');
+    } catch (err) {
+      console.error("Order submission failed:", err);
+      setLoading(false);
+    }
+  };
+
+  const sendDiscordNotification = async (order, docId) => {
+    const charList = order.characters.map(c => `• ${c.name} (${c.stars}⭐)`).join('\n');
+    const embed = {
+      title: `🔥 طلب جديد من سكوب بونتي راش`,
+      color: 15158332,
+      fields: [
+        { name: "رقم الهاتف (كاش)", value: order.phone, inline: true },
+        { name: "السعر الكلي", value: `${order.totalPrice} ج.م`, inline: true },
+        { name: "الشخصيات المطلوبة", value: charList },
+        { name: "رابط التحكم", value: `https://console.firebase.google.com/project/${appId}/firestore` }
+      ],
+      footer: { text: `Order ID: ${docId}` }
+    };
+
+    try {
+      await fetch(DISCORD_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          content: "🚀 **تم استلام طلب جديد!**",
+          embeds: [embed] 
+        })
+      });
+    } catch (err) {
+      console.error("Discord notification failed");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-red-500/30" style={{ direction: 'rtl' }}>
+      {/* Header */}
+      <nav className="border-b border-white/5 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => setView('home')}>
+            <div className="p-2 bg-red-600 rounded-xl group-hover:rotate-12 transition-transform">
+              <Gamepad2 className="text-white w-6 h-6" />
             </div>
-            <p class="subtitle">حصرياً: خدمة تطوير شخصيات ون بيس</p>
-        </header>
-
-        <section class="queue-status glass">
-            <div class="queue-info">
-                <i class="fas fa-clock"></i>
-                <span>حالة الطابور الحالية: </span>
-                <span id="global-queue-count" class="h-text">0</span> انتظار
+            <span className="text-2xl font-black tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              SCOOP OPBR
+            </span>
+          </div>
+          <div className="flex gap-4 items-center">
+            <div className="hidden md:flex bg-white/5 border border-white/10 px-4 py-2 rounded-2xl text-sm items-center gap-3">
+              <Users size={18} className="text-red-500" />
+              <span className="font-bold">في الانتظار: {queueInfo.total}</span>
             </div>
-            <div id="working-status-box" class="working-status">
-                <i class="fas fa-hammer"></i> جاري العمل على الطلب رقم: <span id="working-on-id"
-                    class="h-text">--</span>
-            </div>
-            <div id="user-position-box" class="user-pos hidden">
-                أنت الآن الرقم <span id="user-pos-val" class="h-text">--</span> في الطابور
-            </div>
-        </section>
-
-        <section class="search-section">
-            <div class="search-wrapper">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="char-search" placeholder="ابحث عن شخصيتك المفضلة...">
-            </div>
-        </section>
-
-        <section class="main-content">
-            <div class="char-display">
-                <h2 class="section-label"><i class="fas fa-users"></i> الشخصيات المتاحة</h2>
-                <div class="character-list-grid" id="char-list">
-                    <!-- Characters injected by JS -->
-                </div>
-            </div>
-
-            <aside class="cart-panel">
-                <div class="cart-header">
-                    <h2><i class="fas fa-shopping-cart"></i> سلة التطوير</h2>
-                </div>
-                <div id="cart-items" class="cart-list">
-                    <p class="empty-msg">سلتك فارغة.. اختر شخصية لتبدأ!</p>
-                </div>
-                <div class="cart-footer">
-                    <div class="summary-line">
-                        <span>العدد الإجمالي:</span>
-                        <span id="item-count">0</span>
-                    </div>
-                    <div class="total-display">
-                        <span class="label">السعر النهائي:</span>
-                        <span id="total-price">0</span>
-                        <span class="curr">EGP</span>
-                    </div>
-                    <button id="checkout-btn" class="glow-btn">إتمام الطلب <i class="fas fa-arrow-left"></i></button>
-                    <p class="secure-note"><i class="fas fa-shield-alt"></i> دفع آمن ومباشر</p>
-                </div>
-            </aside>
-        </section>
-
-        <!-- Payment Step Modal -->
-        <div id="payment-modal" class="modal hidden">
-            <div class="modal-content glass">
-                <div class="modal-header">
-                    <h3><i class="fas fa-money-check-alt"></i> خطوة الدفع (مقدم)</h3>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p>يرجى تحويل المبلغ الإجمالي إلى الرقم التالي عبر <strong>فودافون كاش</strong>:</p>
-                    <div class="payment-number-box">
-                        <span class="number">010XXXXXXXX</span>
-                        <button onclick="navigator.clipboard.writeText('010XXXXXXXX')" class="copy-btn"><i
-                                class="fas fa-copy"></i></button>
-                    </div>
-                    <div class="instructions">
-                        <p><i class="fas fa-info-circle"></i> بعد التحويل، التقط صورة للإيصال (Screenshot).</p>
-                        <p><i class="fas fa-envelope"></i> سيتم توجيهك لإرسال الطلب وصورة الدفع تلقائياً.</p>
-                    </div>
-                    <button id="final-confirm-btn" class="final-btn">تم التحويل.. إرسال الطلب!</button>
-                </div>
-            </div>
+          </div>
         </div>
+      </nav>
 
-        <!-- Admin Hidden Panel -->
-        <div id="admin-panel" class="admin-panel hidden">
-            <button id="next-order-btn">إنهاء الطلب الحالي (تقديم الطابور)</button>
+      <main className="max-w-6xl mx-auto p-6 py-10">
+        {view === 'home' && (
+          <div className="space-y-16">
+            <section className="text-center space-y-8 py-20 relative overflow-hidden rounded-[3rem] bg-gradient-to-b from-red-600/10 to-transparent">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-10 pointer-events-none">
+                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-600 via-transparent to-transparent"></div>
+              </div>
+              <div className="inline-flex items-center gap-2 bg-red-600/20 text-red-500 px-4 py-2 rounded-full text-sm font-bold border border-red-500/20 mb-4 animate-bounce">
+                <Flame size={16}/> أسرع تطوير في مصر
+              </div>
+              <h1 className="text-5xl md:text-7xl font-black leading-[1.1] tracking-tight">
+                حول شخصياتك إلى <br/> 
+                <span className="bg-gradient-to-r from-red-500 via-yellow-500 to-red-500 bg-clip-text text-transparent animate-gradient-x">أسطورة حقيقية</span>
+              </h1>
+              <p className="text-slate-400 max-w-2xl mx-auto text-xl leading-relaxed">
+                خدمة سكوب بونتي راش الاحترافية. نحن نقوم بتطوير حسابك (Level Up) بأمان تام وبأفضل الأسعار في السوق.
+              </p>
+              <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
+                <button 
+                  onClick={() => setView('order')}
+                  className="bg-red-600 hover:bg-red-700 text-white px-10 py-5 rounded-2xl font-black text-xl transition-all hover:scale-105 shadow-2xl shadow-red-600/20 w-full md:w-auto"
+                >
+                  اطلب الآن
+                </button>
+                <div className="flex -space-x-3 space-x-reverse items-center pr-4">
+                   {[1,2,3,4].map(i => (
+                     <div key={i} className="w-10 h-10 rounded-full border-2 border-slate-950 bg-slate-800 flex items-center justify-center overflow-hidden">
+                       <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i*123}`} alt="user"/>
+                     </div>
+                   ))}
+                   <span className="text-sm text-slate-500 mr-4 font-bold">+500 عميل سعيد</span>
+                </div>
+              </div>
+            </section>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              <FeatureCard icon={<ShieldCheck className="text-red-500"/>} title="أمان فائق" desc="نستخدم طرق تطوير شرعية 100% تضمن سلامة حسابك من الباند." />
+              <FeatureCard icon={<Clock className="text-blue-500"/>} title="نظام الدور" desc="يمكنك تتبع ترتيبك في الطابور لحظة بلحظة حتى انتهاء الطلب." />
+              <FeatureCard icon={<CreditCard className="text-green-500"/>} title="فودافون كاش" desc="طريقة دفع مصرية سهلة ومباشرة دون تعقيدات البطاقات." />
+            </div>
+          </div>
+        )}
+
+        {view === 'order' && (
+          <div className="grid lg:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-black mb-2">قائمة الشخصيات</h2>
+                  <p className="text-slate-500">اختر الشخصيات التي تريد تطويرها</p>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-2 rounded-2xl flex gap-2">
+                   <button className="bg-red-600 text-xs px-4 py-2 rounded-xl font-bold">الكل</button>
+                   <button className="hover:bg-white/5 text-xs px-4 py-2 rounded-xl font-bold transition-colors">2⭐</button>
+                   <button className="hover:bg-white/5 text-xs px-4 py-2 rounded-xl font-bold transition-colors">4⭐</button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
+                {CHARACTERS.map(char => (
+                  <div 
+                    key={char.id}
+                    onClick={() => toggleCharacter(char)}
+                    className={`group relative p-4 rounded-[2rem] border-2 cursor-pointer transition-all duration-300 ${
+                      selectedChars.find(c => c.id === char.id) 
+                      ? 'border-red-600 bg-red-600/5 ring-4 ring-red-600/10 scale-95' 
+                      : 'border-white/5 bg-slate-900 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="absolute top-4 right-4 z-10">
+                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedChars.find(c => c.id === char.id) ? 'bg-red-600 border-red-600' : 'border-white/20'}`}>
+                          {selectedChars.find(c => c.id === char.id) && <CheckCircle2 size={14}/>}
+                       </div>
+                    </div>
+                    <div className="relative aspect-square mb-4 overflow-hidden rounded-2xl bg-slate-800 flex items-center justify-center">
+                      <img src={char.img} alt={char.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
+                      <div className="absolute bottom-2 left-2 flex gap-0.5">
+                        {[...Array(char.stars)].map((_, i) => (
+                          <Trophy key={i} size={10} className="text-yellow-500 fill-yellow-500" />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-black text-lg leading-tight truncate">{char.name}</h3>
+                      <p className="text-xs text-slate-500 font-medium truncate">{char.title}</p>
+                      <div className="flex items-center justify-between mt-3">
+                         <span className="text-xs px-2 py-1 bg-white/5 rounded-lg text-slate-400 font-bold">{char.type}</span>
+                         <span className="text-red-500 font-black font-mono">{STAR_PRICES[char.stars]} ج.م</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-white/10 h-fit sticky top-28 shadow-2xl">
+                <h3 className="text-2xl font-black mb-8 border-b border-white/5 pb-4">ملخص الحساب</h3>
+                
+                {selectedChars.length === 0 ? (
+                  <div className="text-center py-10 space-y-4">
+                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto text-slate-600">
+                      <Gamepad2 size={32}/>
+                    </div>
+                    <p className="text-slate-500 font-bold">لم تختر أي شخصية بعد</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 mb-8 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    {selectedChars.map(c => (
+                      <div key={c.id} className="flex justify-between items-center group">
+                        <div className="flex items-center gap-3">
+                           <img src={c.img} className="w-8 h-8 rounded-lg bg-slate-800" alt="icon"/>
+                           <span className="text-slate-400 font-bold text-sm">{c.name}</span>
+                        </div>
+                        <span className="font-black text-red-500">{STAR_PRICES[c.stars]} ج.م</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border-t border-white/5 pt-6 mb-8 flex justify-between items-center">
+                  <span className="text-lg font-bold">الإجمالي المستحق</span>
+                  <span className="text-3xl font-black text-white">{totalPrice} <span className="text-sm">ج.م</span></span>
+                </div>
+
+                <div className="bg-red-600/10 border border-red-600/20 p-6 rounded-3xl mb-8 space-y-4">
+                  <div className="flex items-center gap-3 text-red-500 font-black">
+                    <AlertCircle size={20}/>
+                    <span>خطوات الدفع</span>
+                  </div>
+                  <ol className="text-sm space-y-3 text-slate-300 font-medium pr-2 list-decimal list-inside">
+                    <li>حول المبلغ المطلوب لـ <span className="text-white font-bold">{VODAFONE_CASH_NUMBER}</span></li>
+                    <li>اكتب رقم هاتفك الذي قمت بالتحويل منه بالأسفل</li>
+                    <li>اضغط على تأكيد ليتم وضعك في الطابور</li>
+                  </ol>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-400 mr-2">رقم هاتفك (المرسل)</label>
+                    <input 
+                      type="tel" 
+                      placeholder="01XXXXXXXXX"
+                      className="w-full bg-slate-950 border border-white/10 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-red-600 outline-none font-mono text-lg transition-all"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    disabled={loading || selectedChars.length === 0 || !phone}
+                    onClick={handleSubmitOrder}
+                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-red-600/20 text-lg"
+                  >
+                    {loading ? 'جاري تأكيد طلبك...' : 'تأكيد الطلب والدخول للطابور'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === 'status' && myOrder && (
+          <div className="max-w-2xl mx-auto text-center space-y-12 py-10 animate-in zoom-in duration-500">
+            <div className="relative inline-block">
+              <div className="w-48 h-48 rounded-[3rem] border-8 border-red-600/20 border-t-red-600 animate-spin mx-auto"></div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-sm font-black text-slate-500 uppercase tracking-widest">ترتيبك</span>
+                <span className="text-6xl font-black text-white">{queueInfo.position}</span>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <h2 className="text-4xl font-black">طلبك في أيدٍ أمينة!</h2>
+              <p className="text-slate-400 text-lg">باقي {queueInfo.position - 1} أشخاص فقط أمامك في الطابور.</p>
+            </div>
+
+            <div className="bg-slate-900 border border-white/10 rounded-[3rem] p-10 text-right shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-3xl rounded-full"></div>
+              <h3 className="font-black text-2xl mb-10 flex items-center gap-3">
+                 <div className="w-2 h-8 bg-red-600 rounded-full"></div>
+                 تتبع حالة التنفيذ
+              </h3>
+              <div className="space-y-10 relative">
+                <div className="absolute top-4 right-3.5 bottom-4 w-0.5 bg-white/5"></div>
+                <StatusStep 
+                  active={true} 
+                  done={true} 
+                  title="تم استلام التحويل" 
+                  desc="تم التأكد من وصول مبلغ التحويل الخاص بك."
+                />
+                <StatusStep 
+                  active={myOrder.status === 'in-progress' || myOrder.status === 'completed'} 
+                  done={myOrder.status === 'completed'}
+                  title="جاري العمل على التطوير" 
+                  desc="يقوم فريقنا الآن بالدخول وتطوير الشخصيات المطلوبة."
+                />
+                <StatusStep 
+                  active={myOrder.status === 'completed'} 
+                  done={myOrder.status === 'completed'}
+                  title="تم الانتهاء بنجاح" 
+                  desc="يمكنك الآن استلام حسابك وتفقد التعديلات الجديدة!"
+                />
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setView('home')}
+              className="bg-white/5 hover:bg-white/10 text-white px-8 py-4 rounded-2xl font-bold transition-all flex items-center gap-2 mx-auto"
+            >
+              العودة للرئيسية <ChevronRight size={20}/>
+            </button>
+          </div>
+        )}
+      </main>
+
+      <footer className="border-t border-white/5 py-20 mt-20 text-center relative">
+         <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-3 gap-10 text-right mb-10">
+            <div className="space-y-4">
+               <h4 className="font-black text-xl">حول سكوب</h4>
+               <p className="text-slate-500 text-sm leading-relaxed">المكان الأول والآمن لتطوير حسابات Bounty Rush في الوطن العربي بأيدي محترفين.</p>
+            </div>
+            <div className="space-y-4">
+               <h4 className="font-black text-xl">الدعم الفني</h4>
+               <p className="text-slate-500 text-sm">تواصل معنا عبر ديسكورد لأي استفسار بخصوص طلبك.</p>
+            </div>
+            <div className="space-y-4">
+               <h4 className="font-black text-xl">تنبيه هام</h4>
+               <p className="text-slate-500 text-sm">نحن لا نطلب منك كلمة السر الخاصة بـ Gmail أو Apple ID، فقط كود الانتقال.</p>
+            </div>
+         </div>
+         <div className="text-slate-600 text-xs font-bold">© 2024 SCOOP BOUNTY RUSH - MADE WITH ❤️ FOR THE COMMUNITY</div>
+      </footer>
+    </div>
+  );
+}
+
+function FeatureCard({ icon, title, desc }) {
+  return (
+    <div className="bg-slate-900/40 p-10 rounded-[2.5rem] border border-white/5 hover:border-red-500/20 transition-all text-right group">
+      <div className="mb-6 p-4 bg-white/5 w-fit rounded-2xl group-hover:bg-red-600/10 group-hover:text-red-500 transition-colors">{icon}</div>
+      <h3 className="text-2xl font-black mb-4">{title}</h3>
+      <p className="text-slate-500 leading-relaxed font-medium">{desc}</p>
+    </div>
+  );
+}
+
+function StatusStep({ active, done, title, desc }) {
+  return (
+    <div className={`flex gap-6 relative z-10 ${active ? 'opacity-100' : 'opacity-20 transition-opacity duration-1000'}`}>
+      <div className="flex flex-col items-center">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${done ? 'bg-green-500 scale-110 shadow-lg shadow-green-500/20' : 'bg-red-600 ring-4 ring-red-600/20 animate-pulse'}`}>
+          {done ? <CheckCircle2 size={18} className="text-white"/> : <Clock size={18} className="text-white"/>}
         </div>
-    </main>
-
-    <!-- Firebase SDKs (Required before script.js) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="script.js"></script>
-</body>
-
-</html>
+      </div>
+      <div className="space-y-1">
+        <h4 className={`font-black text-lg ${done ? 'text-green-500' : 'text-white'}`}>{title}</h4>
+        <p className="text-sm text-slate-500 font-bold">{desc}</p>
+      </div>
+    </div>
+  );
+}
